@@ -2,7 +2,7 @@ import { useQuery } from 'react-query';
 import { useSettings } from '../context/SettingsContext';
 import type { MarketData } from '../types';
 
-const MOCK_DATA: MarketData[] = [
+const FALLBACK_DATA: MarketData[] = [
   { symbol: 'EUR/USD', price: 1.0925, change: 0.0015, changePercent: 0.14, timestamp: Date.now() },
   { symbol: 'GBP/USD', price: 1.2650, change: -0.0025, changePercent: -0.20, timestamp: Date.now() },
   { symbol: 'USD/JPY', price: 148.75, change: 0.45, changePercent: 0.30, timestamp: Date.now() },
@@ -67,7 +67,7 @@ async function fetchForexData(): Promise<MarketData[]> {
     ];
   } catch (error) {
     console.error('Error fetching forex data:', error);
-    return MOCK_DATA;
+    return FALLBACK_DATA;
   }
 }
 
@@ -76,7 +76,7 @@ export function useMarketData() {
   
   return useQuery(
     'marketData',
-    () => settings.demoMode ? Promise.resolve(MOCK_DATA) : fetchForexData(),
+    () => settings.demoMode ? Promise.resolve(FALLBACK_DATA) : fetchForexData(),
     {
       refetchInterval: settings.refreshInterval * 1000,
       retry: 2,
@@ -84,7 +84,7 @@ export function useMarketData() {
       onError: (error) => {
         console.error('Market data fetch error:', error);
       },
-      initialData: MOCK_DATA,
+      fallbackData: FALLBACK_DATA,
       staleTime: 10000
     }
   );

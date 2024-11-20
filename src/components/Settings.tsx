@@ -3,24 +3,16 @@ import { Settings as SettingsIcon, DollarSign, Clock, Database, Sun, Moon, Cpu }
 import { useSettings } from '../context/SettingsContext';
 import type { GPTModel } from '../types';
 
-const GPT_MODELS: { value: GPTModel; label: string; description: string; costInfo: string }[] = [
+const GPT_MODELS: { value: GPTModel; label: string; description: string }[] = [
   {
     value: 'gpt-3.5-turbo',
     label: 'GPT-3.5 Turbo',
-    description: 'Plus rapide et moins coûteux, idéal pour l\'analyse basique',
-    costInfo: '0.002€/1K tokens'
+    description: 'Plus rapide et moins coûteux, idéal pour l\'analyse basique'
   },
   {
     value: 'gpt-4',
     label: 'GPT-4',
-    description: 'Plus précis mais plus coûteux, pour une analyse approfondie',
-    costInfo: '0.03€/1K tokens'
-  },
-  {
-    value: 'gpt-4-turbo-preview',
-    label: 'GPT-4 Turbo',
-    description: 'Version améliorée de GPT-4, plus rapide et moins coûteuse',
-    costInfo: '0.01€/1K tokens'
+    description: 'Plus précis mais plus coûteux, pour une analyse approfondie'
   }
 ];
 
@@ -78,7 +70,7 @@ export default function Settings() {
           <label className="block text-sm font-medium dark:text-gray-300 light:text-gray-700">
             Modèle GPT
           </label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {GPT_MODELS.map((model) => (
               <button
                 key={model.value}
@@ -93,8 +85,7 @@ export default function Settings() {
                   <span className="font-medium text-blue-400">{model.label}</span>
                   <Cpu className="h-5 w-5 text-blue-400" />
                 </div>
-                <p className="text-sm text-gray-400 mb-2">{model.description}</p>
-                <p className="text-xs text-blue-400/80">{model.costInfo}</p>
+                <p className="text-sm text-gray-400">{model.description}</p>
               </button>
             ))}
           </div>

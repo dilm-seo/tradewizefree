@@ -4,194 +4,134 @@ import { useNews } from '../hooks/useNews';
 import { useOpenAI } from '../services/openai';
 import { useSettings } from '../context/SettingsContext';
 
-const BANK_INFO = {
-  'BCE': {
-    fullName: 'Banque Centrale Européenne',
-    keywords: ['bce', 'lagarde', 'banque centrale européenne']
-  },
-  'FED': {
-    fullName: 'Federal Reserve',
-    keywords: ['fed', 'powell', 'federal reserve']
-  },
-  'BOE': {
-    fullName: 'Bank of England',
-    keywords: ['boe', 'bailey', 'bank of england']
-  }
-} as const;
+const CENTRAL_BANK_PROMPT = `En tant qu'analyste spécialisé dans les banques centrales, analysez les actualités suivantes pour déterminer la position actuelle des principales banques centrales.
 
-interface CentralBank {
-  name: keyof typeof BANK_INFO;
-  fullName: string;
-  stance: 'Hawkish' | 'Dovish' | 'Neutre';
-  lastUpdate: string;
-  nextMeeting: string;
-  keyMessage: string;
-  impact: 'high' | 'medium' | 'low';
-}
-
-const CENTRAL_BANK_PROMPT = `Analysez les actualités des banques centrales.
-
-Actualités:
+Actualités à analyser :
 {newsContext}
 
-Répondez avec un JSON de cette structure exacte:
-{
-  "banks": [
-    {
-      "name": "BCE" | "FED" | "BOE",
-      "stance": "Hawkish" | "Dovish" | "Neutre",
-      "lastUpdate": "YYYY-MM-DD",
-      "nextMeeting": "YYYY-MM-DD",
-      "keyMessage": "Message principal",
-      "impact": "high" | "medium" | "low"
-    }
-  ]
+Instructions d'analyse :
+1. Pour chaque banque centrale (BCE, FED, BOE) :
+   - Identifiez la stance actuelle (hawkish/dovish/neutre)
+   - Évaluez les changements de ton récents
+   - Déterminez les points clés de leur communication
+   - Anticipez les prochaines actions probables
+
+2. Fournissez une analyse structurée en HTML avec :
+   - Un résumé par banque centrale
+   - Une évaluation de la stance monétaire
+   - Les implications pour les devises concernées
+
+Format : Réponse en HTML avec classes Tailwind CSS.`;
+
+interface CentralBank {
+  name: string;
+  fullName: string;
+  latestNews: string;
+  pubDate: string;
+  stance: 'Hawkish' | 'Dovish' | 'Neutre';
+  newsCount: number;
+  color: string;
+  icon: React.ReactNode;
 }
 
-Règles strictes:
-1. name: uniquement BCE, FED, ou BOE
-2. stance: uniquement Hawkish, Dovish, ou Neutre
-3. dates: format YYYY-MM-DD ou "Non annoncé"
-4. keyMessage: max 100 caractères
-5. impact: uniquement high, medium, low
-6. Texte en français uniquement`;
-
-const MOCK_BANKS: CentralBank[] = [
-  {
-    name: 'BCE',
-    fullName: 'Banque Centrale Européenne',
-    stance: 'Hawkish',
-    lastUpdate: new Date().toISOString().split('T')[0],
-    nextMeeting: 'Non annoncé',
-    keyMessage: 'Maintien des taux élevés pour lutter contre l\'inflation',
-    impact: 'high'
-  },
-  {
-    name: 'FED',
-    fullName: 'Federal Reserve',
-    stance: 'Neutre',
-    lastUpdate: new Date().toISOString().split('T')[0],
-    nextMeeting: 'Non annoncé',
-    keyMessage: 'Données dépendantes pour les prochaines décisions',
-    impact: 'medium'
-  },
-  {
-    name: 'BOE',
-    fullName: 'Bank of England',
-    stance: 'Dovish',
-    lastUpdate: new Date().toISOString().split('T')[0],
-    nextMeeting: 'Non annoncé',
-    keyMessage: 'Signes de ralentissement économique',
-    impact: 'medium'
-  }
-];
-
-const CentralBankMonitor = forwardRef<{ handleAnalysis: () => Promise<void> }, {}>((_props, ref) => {
-  const [banks, setBanks] = useState<CentralBank[]>([]);
+const CentralBankMonitor = forwardRef((props, ref) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { data: news } = useNews();
   const { analyzeMarket } = useOpenAI();
   const { settings } = useSettings();
-  const { data: news } = useNews();
 
-  const validateBank = (bank: any): bank is Omit<CentralBank, 'fullName'> => {
-    const validNames = ['BCE', 'FED', 'BOE'];
-    const validStances = ['Hawkish', 'Dovish', 'Neutre'];
-    const validImpacts = ['high', 'medium', 'low'];
-    
-    const isValidDate = (dateStr: string) => {
-      if (dateStr === 'Non annoncé') return true;
-      const date = new Date(dateStr);
-      return date instanceof Date && !isNaN(date.getTime());
+  const centralBanks = React.useMemo(() => {
+    if (!news) return [];
+
+    const bankKeywords = {
+      'BCE': {
+        keywords: ['bce', 'lagarde', 'banque centrale européenne'],
+        fullName: 'Banque Centrale Européenne',
+        color: 'blue'
+      },
+      'FED': {
+        keywords: ['fed', 'powell', 'federal reserve'],
+        fullName: 'Federal Reserve',
+        color: 'emerald'
+      },
+      'BOE': {
+        keywords: ['boe', 'bailey', 'bank of england'],
+        fullName: 'Bank of England',
+        color: 'purple'
+      }
     };
 
-    return (
-      validNames.includes(bank.name) &&
-      validStances.includes(bank.stance) &&
-      isValidDate(bank.lastUpdate) &&
-      isValidDate(bank.nextMeeting) &&
-      validImpacts.includes(bank.impact) &&
-      typeof bank.keyMessage === 'string' &&
-      bank.keyMessage.length <= 100
-    );
-  };
+    return Object.entries(bankKeywords).map(([bank, info]) => {
+      const relevantNews = news.filter(item => 
+        info.keywords.some(keyword => 
+          item.title.toLowerCase().includes(keyword) || 
+          item.content.toLowerCase().includes(keyword)
+        )
+      );
+
+      if (relevantNews.length === 0) return null;
+
+      const latestNews = relevantNews[0];
+      const content = latestNews.content.toLowerCase();
+      
+      let stance: 'Hawkish' | 'Dovish' | 'Neutre' = 'Neutre';
+      let icon = <Minus className={`h-5 w-5 text-${info.color}-400`} />;
+
+      if (content.includes('hawkish') || content.includes('restrictif') || content.includes('hausse des taux')) {
+        stance = 'Hawkish';
+        icon = <TrendingUp className={`h-5 w-5 text-${info.color}-400`} />;
+      } else if (content.includes('dovish') || content.includes('accommodant') || content.includes('baisse des taux')) {
+        stance = 'Dovish';
+        icon = <TrendingDown className={`h-5 w-5 text-${info.color}-400`} />;
+      }
+
+      return {
+        name: bank,
+        fullName: info.fullName,
+        latestNews: latestNews.translatedTitle || latestNews.title,
+        pubDate: latestNews.pubDate,
+        stance,
+        newsCount: relevantNews.length,
+        color: info.color,
+        icon
+      };
+    }).filter(Boolean) as CentralBank[];
+  }, [news]);
 
   const handleAnalysis = async () => {
-    if (!settings.apiKey || isAnalyzing) return;
-    
+    if (!settings.apiKey || isAnalyzing || !news) return;
+
     setIsAnalyzing(true);
     setError(null);
     
     try {
-      if (settings.demoMode) {
-        setBanks(MOCK_BANKS);
-        return;
-      }
+      const centralBankNews = news.filter(item => {
+        const content = (item.title + item.content).toLowerCase();
+        return content.includes('bce') || 
+               content.includes('fed') || 
+               content.includes('lagarde') || 
+               content.includes('powell') ||
+               content.includes('banque centrale') ||
+               content.includes('federal reserve') ||
+               content.includes('bank of england') ||
+               content.includes('boe');
+      });
 
-      if (!news || news.length === 0) {
-        throw new Error("Aucune actualité disponible");
-      }
-
-      // Filtrer les actualités par banque centrale
-      const bankNews = Object.entries(BANK_INFO).reduce((acc, [bank, info]) => {
-        const relevantNews = news.filter(item => {
-          const content = (item.title + ' ' + item.content).toLowerCase();
-          return info.keywords.some(keyword => content.includes(keyword));
-        });
-        acc[bank] = relevantNews;
-        return acc;
-      }, {} as Record<string, typeof news>);
-
-      // Vérifier si nous avons des actualités
-      const hasNews = Object.values(bankNews).some(news => news && news.length > 0);
-      if (!hasNews) {
-        throw new Error("Aucune actualité des banques centrales disponible");
-      }
-
-      // Préparer le contexte
-      const newsContext = Object.entries(bankNews)
-        .map(([bank, news]) => {
-          if (!news?.length) return '';
-          return `${bank}:\n${news
-            .slice(0, 3)
-            .map(item => `- ${item.translatedTitle || item.title}`)
-            .join('\n')}`;
-        })
-        .filter(Boolean)
+      const newsContext = centralBankNews
+        .slice(0, 5)
+        .map(item => `- ${item.translatedTitle || item.title}\n${item.translatedContent || item.content}`)
         .join('\n\n');
 
       const result = await analyzeMarket(CENTRAL_BANK_PROMPT, {
         newsContext
       });
 
-      try {
-        const parsed = JSON.parse(result);
-        
-        if (!parsed || !Array.isArray(parsed.banks)) {
-          throw new Error("Structure JSON invalide");
-        }
-
-        const validBanks = parsed.banks
-          .filter(validateBank)
-          .map(bank => ({
-            ...bank,
-            fullName: BANK_INFO[bank.name as keyof typeof BANK_INFO].fullName
-          }));
-
-        if (validBanks.length === 0) {
-          throw new Error("Aucune analyse valide disponible");
-        }
-
-        setBanks(validBanks);
-      } catch (parseError) {
-        console.error('Parse error:', parseError);
-        throw new Error("Format de réponse invalide");
-      }
+      setAnalysis(result);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Une erreur s'est produite";
-      console.error('Erreur analyse banques centrales:', errorMessage);
-      setError(errorMessage);
-      setBanks([]);
+      console.error('Erreur analyse banques centrales:', error);
+      setError("Une erreur s'est produite lors de l'analyse");
     } finally {
       setIsAnalyzing(false);
     }
@@ -201,45 +141,22 @@ const CentralBankMonitor = forwardRef<{ handleAnalysis: () => Promise<void> }, {
     handleAnalysis
   }));
 
-  const getStanceIcon = (stance: string) => {
-    switch (stance) {
-      case 'Hawkish':
-        return <TrendingUp className="h-5 w-5 text-emerald-400" />;
-      case 'Dovish':
-        return <TrendingDown className="h-5 w-5 text-red-400" />;
-      default:
-        return <Minus className="h-5 w-5 text-blue-400" />;
-    }
-  };
-
-  const getStanceStyle = (stance: string) => {
-    switch (stance) {
-      case 'Hawkish':
-        return 'bg-emerald-500/20 text-emerald-400';
-      case 'Dovish':
-        return 'bg-red-500/20 text-red-400';
-      default:
-        return 'bg-blue-500/20 text-blue-400';
-    }
-  };
-
-  const getImpactStyle = (impact: string) => {
-    switch (impact) {
-      case 'high':
-        return 'text-red-400';
-      case 'medium':
-        return 'text-yellow-400';
-      default:
-        return 'text-green-400';
-    }
+  const getStanceStyle = (stance: string, color: string) => {
+    return {
+      Hawkish: `bg-${color}-400/20 text-${color}-400`,
+      Dovish: `bg-${color}-400/20 text-${color}-400`,
+      Neutre: `bg-${color}-400/20 text-${color}-400`
+    }[stance];
   };
 
   return (
     <div className="bg-gray-800/50 rounded-xl p-6 backdrop-blur-sm border border-gray-700">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-semibold">Banques Centrales</h2>
-          <p className="text-sm text-gray-400">Analyse des communications officielles</p>
+          <h2 className="text-xl font-semibold">Actualités Banques Centrales</h2>
+          <p className="text-sm text-gray-400 mt-1">
+            Analyse IA des communications des banques centrales
+          </p>
         </div>
         <div className="flex items-center space-x-4">
           <Building2 className="h-6 w-6 text-yellow-400" />
@@ -247,7 +164,7 @@ const CentralBankMonitor = forwardRef<{ handleAnalysis: () => Promise<void> }, {
             onClick={handleAnalysis}
             disabled={isAnalyzing || !settings.apiKey}
             className="flex items-center space-x-2 px-4 py-2 bg-yellow-500 text-white rounded-lg 
-                     hover:bg-yellow-600 transition disabled:opacity-50"
+                     hover:bg-yellow-600 transition disabled:opacity-50 disabled:hover:bg-yellow-500"
           >
             {isAnalyzing ? (
               <>
@@ -271,8 +188,8 @@ const CentralBankMonitor = forwardRef<{ handleAnalysis: () => Promise<void> }, {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {banks.map((bank) => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {centralBanks.map((bank) => (
           <div key={bank.name} className="p-4 bg-gray-700/30 rounded-lg">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -280,8 +197,8 @@ const CentralBankMonitor = forwardRef<{ handleAnalysis: () => Promise<void> }, {
                 <p className="text-sm text-gray-400">{bank.fullName}</p>
               </div>
               <div className="flex items-center space-x-2">
-                {getStanceIcon(bank.stance)}
-                <span className={`px-2 py-1 rounded text-xs font-medium ${getStanceStyle(bank.stance)}`}>
+                {bank.icon}
+                <span className={`px-2 py-1 rounded text-xs font-medium ${getStanceStyle(bank.stance, bank.color)}`}>
                   {bank.stance}
                 </span>
               </div>
@@ -289,34 +206,39 @@ const CentralBankMonitor = forwardRef<{ handleAnalysis: () => Promise<void> }, {
             
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-gray-300 line-clamp-2">{bank.keyMessage}</p>
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Impact</span>
-                    <span className={getImpactStyle(bank.impact)}>
-                      {bank.impact === 'high' ? 'Élevé' : bank.impact === 'medium' ? 'Moyen' : 'Faible'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Mise à jour</span>
-                    <span className="text-gray-300">{bank.lastUpdate}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Prochaine réunion</span>
-                    <span className="text-gray-300">{bank.nextMeeting}</span>
-                  </div>
+                <p className="text-sm text-gray-300 line-clamp-2">{bank.latestNews}</p>
+                <div className="flex items-center justify-between mt-2 text-sm">
+                  <span className="text-gray-400">
+                    {new Date(bank.pubDate).toLocaleString()}
+                  </span>
+                  <span className={`text-${bank.color}-400`}>
+                    {bank.newsCount} actualité{bank.newsCount > 1 ? 's' : ''}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
         ))}
-
-        {banks.length === 0 && !isAnalyzing && !error && (
-          <div className="col-span-3 text-center py-8 text-gray-400">
-            Cliquez sur Analyser pour obtenir les dernières informations
-          </div>
-        )}
       </div>
+
+      {analysis && (
+        <div className="mt-6 p-4 bg-gray-700/30 rounded-lg">
+          <h3 className="text-lg font-medium mb-4">Analyse Détaillée</h3>
+          <div 
+            className="prose prose-invert max-w-none"
+            dangerouslySetInnerHTML={{ __html: analysis }}
+          />
+        </div>
+      )}
+
+      {isAnalyzing && (
+        <div className="text-center py-8 text-gray-400">
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-yellow-400" />
+            <p>Analyse des communications des banques centrales en cours...</p>
+          </div>
+        </div>
+      )}
 
       {!settings.apiKey && (
         <p className="text-sm text-red-400 mt-4">

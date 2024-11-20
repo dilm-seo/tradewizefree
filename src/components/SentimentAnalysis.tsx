@@ -15,15 +15,15 @@ interface SentimentResult {
   timeframe: string;
 }
 
-const SENTIMENT_PROMPT = `Analysez le sentiment des paires forex majeures (EUR/USD, GBP/USD, USD/JPY).
+const SENTIMENT_PROMPT = `Analysez le sentiment des paires forex suivantes: EUR/USD, GBP/USD, USD/JPY.
 
 Marché actuel:
 {marketContext}
 
-Actualités importantes:
+Actualités récentes:
 {newsContext}
 
-Répondez avec un JSON valide de cette structure exacte:
+Répondez UNIQUEMENT avec un objet JSON valide ayant cette structure exacte:
 {
   "analysis": [
     {
@@ -32,24 +32,18 @@ Répondez avec un JSON valide de cette structure exacte:
       "score": 75,
       "confidence": 80,
       "timeframe": "court terme",
-      "keyFactors": [
-        "BCE hawkish",
-        "USD faible"
-      ],
-      "reasoning": "Tendance haussière soutenue par la position hawkish de la BCE"
+      "keyFactors": ["facteur 1", "facteur 2"],
+      "reasoning": "analyse courte"
     }
   ]
 }
 
 Règles strictes:
-1. Uniquement les paires EUR/USD, GBP/USD, USD/JPY
-2. sentiment: "bullish", "bearish" ou "neutral"
-3. score: -100 à +100 (force du sentiment)
-4. confidence: 0 à 100 (niveau de confiance)
-5. timeframe: "court terme" (0-24h), "moyen terme" (1-7j)
-6. keyFactors: 2-3 facteurs courts et précis
-7. reasoning: max 100 caractères, en français
-8. Priorisez les actualités à fort impact`;
+- sentiment doit être "bullish", "bearish" ou "neutral"
+- score doit être entre -100 et 100
+- confidence doit être entre 0 et 100
+- keyFactors doit avoir 2-3 éléments
+- reasoning doit être bref (max 100 caractères)`;
 
 const SentimentAnalysis = forwardRef<{ handleAnalysis: () => Promise<void> }, {}>((_props, ref) => {
   const [results, setResults] = useState<SentimentResult[]>([]);
@@ -61,26 +55,20 @@ const SentimentAnalysis = forwardRef<{ handleAnalysis: () => Promise<void> }, {}
   const { data: news } = useNews();
 
   const validateResult = (result: any): result is SentimentResult => {
-    const validPairs = ['EUR/USD', 'GBP/USD', 'USD/JPY'];
-    const validSentiments = ['bullish', 'bearish', 'neutral'];
-    const validTimeframes = ['court terme', 'moyen terme'];
-
     return (
-      validPairs.includes(result.pair) &&
-      validSentiments.includes(result.sentiment) &&
+      typeof result.pair === 'string' &&
+      ['bullish', 'bearish', 'neutral'].includes(result.sentiment) &&
       typeof result.score === 'number' &&
       result.score >= -100 &&
       result.score <= 100 &&
       typeof result.confidence === 'number' &&
       result.confidence >= 0 &&
       result.confidence <= 100 &&
-      validTimeframes.includes(result.timeframe) &&
       Array.isArray(result.keyFactors) &&
       result.keyFactors.length >= 2 &&
       result.keyFactors.length <= 3 &&
-      result.keyFactors.every(f => typeof f === 'string' && f.length <= 30) &&
       typeof result.reasoning === 'string' &&
-      result.reasoning.length <= 100
+      typeof result.timeframe === 'string'
     );
   };
 
@@ -95,38 +83,21 @@ const SentimentAnalysis = forwardRef<{ handleAnalysis: () => Promise<void> }, {}
         throw new Error("Données de marché ou actualités non disponibles");
       }
 
-      // Filtrer les actualités importantes
-      const relevantNews = news
-        .filter(item => {
-          const content = (item.title + item.content).toLowerCase();
-          return content.includes('eur') ||
-                 content.includes('usd') ||
-                 content.includes('gbp') ||
-                 content.includes('jpy') ||
-                 content.includes('fed') ||
-                 content.includes('bce') ||
-                 content.includes('boe') ||
-                 content.includes('inflation') ||
-                 content.includes('pib') ||
-                 content.includes('emploi');
-        })
-        .slice(0, 3)
-        .map(item => item.translatedTitle || item.title);
-
-      if (relevantNews.length === 0) {
-        throw new Error("Aucune actualité importante détectée");
-      }
-
       const marketContext = marketData
-        .filter(data => ['EUR/USD', 'GBP/USD', 'USD/JPY'].includes(data.symbol))
+        .slice(0, 3)
         .map(data => 
           `${data.symbol}: ${data.price} (${data.changePercent > 0 ? '+' : ''}${data.changePercent.toFixed(2)}%)`
         )
         .join('\n');
 
+      const newsContext = news
+        .slice(0, 3)
+        .map(item => `- ${item.translatedTitle || item.title}`)
+        .join('\n');
+
       const response = await analyzeMarket(SENTIMENT_PROMPT, {
         marketContext,
-        newsContext: relevantNews.join('\n')
+        newsContext
       });
 
       try {
@@ -145,7 +116,7 @@ const SentimentAnalysis = forwardRef<{ handleAnalysis: () => Promise<void> }, {}
         setResults(validResults);
       } catch (parseError) {
         console.error('Parse error:', parseError);
-        throw new Error("Format de réponse invalide");
+        throw new Error(parseError instanceof Error ? parseError.message : "Erreur de parsing JSON");
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Une erreur inattendue s'est produite";
@@ -246,7 +217,7 @@ const SentimentAnalysis = forwardRef<{ handleAnalysis: () => Promise<void> }, {}
               </div>
               <div className="flex justify-between mt-1 text-xs text-gray-400">
                 <span>Bearish</span>
-                <span>{result.score}</span>
+                <span>Score: {result.score}</span>
                 <span>Bullish</span>
               </div>
             </div>

@@ -3,64 +3,49 @@ import type { Settings, SettingsContextType } from '../types';
 import CostToast from '../components/CostToast';
 
 const defaultPrompts = {
-  fundamentalAnalysis: `Analysez ces actualités forex pour identifier les opportunités de trading immédiates:
+  fundamentalAnalysis: `Analysez les actualités forex pour identifier les opportunités de trading immédiates.
 
+Actualités :
 {newsContext}
 
-Répondez avec un HTML bref et structuré contenant:
-1. Une liste de maximum 3 opportunités principales
-2. Pour chaque opportunité:
-   - La paire de devises concernée
-   - La direction probable (haussier/baissier)
-   - Le catalyseur principal
-   - Le risque majeur
+Instructions :
+1. Identifiez les actualités à fort impact
+2. Évaluez l'impact sur les devises majeures
+3. Déterminez les opportunités de trading
+4. Listez les risques principaux
 
-Utilisez ces classes Tailwind:
-- Titres: text-lg font-medium text-blue-400 mb-2
-- Sections: p-4 bg-gray-800/50 rounded-lg mb-4
-- Listes: space-y-2
-- Éléments: flex items-center justify-between
+Format : Réponse courte et structurée en HTML avec classes Tailwind CSS.`,
 
-Soyez concis et direct.`,
+  tradingSignals: `Générez des signaux de trading basés sur l'actualité immédiate.
 
-  tradingSignals: `Analysez le marché forex actuel.
+Marché : {marketContext}
+News : {newsContext}
 
-Données de marché:
-{marketContext}
+Format JSON :
+[{
+  symbol: string,
+  direction: "buy" | "sell",
+  timing: string,
+  volatility: string,
+  duration: string,
+  analysis: string
+}]`,
 
-Actualités:
-{newsContext}
+  aiInsights: `Analysez l'impact des actualités sur le forex.
 
-Répondez avec un JSON valide:
-{
-  "signals": [
-    {
-      "pair": string,
-      "direction": "buy" | "sell",
-      "timing": string,
-      "volatility": "high" | "medium" | "low",
-      "duration": string,
-      "analysis": string
-    }
-  ]
-}`,
+Données : 
+- News : {newsContext}
+- Marché : {marketContext}
+- Question : {question}
 
-  aiInsights: `Analysez cette question sur le forex:
-{question}
+Format : Réponse courte et précise focalisée sur la question.`,
 
-Contexte marché:
-{marketContext}
+  mascot: `Analysez uniquement les actualités à fort impact.
 
-Actualités:
-{newsContext}
+News : {newsContext}
+Événements : {calendarContext}
 
-Répondez de manière concise et directe.`,
-
-  mascot: `Analysez brièvement les actualités forex:
-{newsContext}
-
-Répondez en 2-3 phrases maximum.
-Focalisez sur l'opportunité la plus importante.`
+Format : 2-3 phrases maximum sur l'actualité la plus importante.`
 };
 
 const defaultSettings: Settings = {
@@ -77,14 +62,13 @@ const defaultSettings: Settings = {
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-// Export the hook
-export const useSettings = () => {
+export function useSettings() {
   const context = useContext(SettingsContext);
   if (context === undefined) {
     throw new Error('useSettings must be used within a SettingsProvider');
   }
   return context;
-};
+}
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<Settings>(() => {
