@@ -6,22 +6,7 @@ const RSS_FEEDS = [
   'https://www.forexlive.com/feed/news',
   'https://www.forexlive.com/feed/technicalanalysis',
   'https://www.forexlive.com/feed/forexorders',
-  'https://www.forexlive.com/feed/centralbank',
-  // Reuters feeds
-  'https://www.reutersagency.com/feed/?best-topics=foreign-exchange&post_type=best',
-  // Bloomberg feeds (via RSS Bridge)
-  'https://rsshub.app/bloomberg/topics/markets',
-  // FXStreet alternative feeds
-  'https://www.fxstreet.com/rss/news',
-  'https://www.fxstreet.com/rss/analysis/central-banks',
-  // Investing.com feeds
-  'https://www.investing.com/rss/forex.rss',
-  'https://www.investing.com/rss/news.rss',
-  'https://www.investing.com/rss/market_overview.rss',
-  // Additional forex feeds
-  'https://www.dailyfx.com/feeds/market-news',
-  'https://www.financemagnates.com/feed/',
-  'https://www.actionforex.com/feed/'
+  'https://www.forexlive.com/feed/centralbank'
 ];
 
 const CORS_PROXIES = [
