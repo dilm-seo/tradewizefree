@@ -1,18 +1,12 @@
-import React, { useState } from 'react';
-import { Clock, Tag, User, Languages } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Clock, Tag, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNews } from '../hooks/useNews';
 import { useSettings } from '../context/SettingsContext';
 import { translateText } from '../services/translate';
 import type { NewsItem } from '../types';
 
-interface NewsItemWithTranslation extends NewsItem {
-  translatedTitle?: string;
-  translatedContent?: string;
-  isTranslating?: boolean;
-}
-
-const mockNews: NewsItemWithTranslation[] = [
+const mockNews: NewsItem[] = [
   {
     title: "La BCE maintient ses taux directeurs",
     link: "#",
@@ -31,51 +25,50 @@ const mockNews: NewsItemWithTranslation[] = [
   }
 ];
 
+interface TranslatedNewsItem extends NewsItem {
+  translatedTitle: string;
+  translatedContent: string;
+}
+
 export default function NewsFeed() {
   const { settings } = useSettings();
   const { data: news, isLoading } = useNews();
-  const [newsItems, setNewsItems] = useState<NewsItemWithTranslation[]>([]);
+  const [translatedNews, setTranslatedNews] = useState<TranslatedNewsItem[]>([]);
 
-  React.useEffect(() => {
+  const translateNewsItems = useCallback(async () => {
     if (settings.demoMode) {
-      setNewsItems(mockNews);
-    } else if (news) {
-      setNewsItems(news.map(item => ({
+      setTranslatedNews(mockNews.map(item => ({
         ...item,
-        isTranslating: false
+        translatedTitle: item.title,
+        translatedContent: item.content
       })));
+      return;
     }
+
+    if (!news?.length) return;
+
+    // Remove duplicates based on title
+    const uniqueNews = news.filter((item, index, self) =>
+      index === self.findIndex((t) => t.title === item.title)
+    );
+
+    const translated = await Promise.all(
+      uniqueNews.map(async (item) => ({
+        ...item,
+        content: item.content.length > 200 ? item.content.substring(0, 200) + '...' : item.content,
+        translatedTitle: await translateText(item.title),
+        translatedContent: await translateText(
+          item.content.length > 200 ? item.content.substring(0, 200) + '...' : item.content
+        )
+      }))
+    );
+
+    setTranslatedNews(translated);
   }, [news, settings.demoMode]);
 
-  const handleTranslate = async (index: number) => {
-    const item = newsItems[index];
-    if (item.translatedTitle && item.translatedContent) return;
-
-    setNewsItems(prev => prev.map((item, i) => 
-      i === index ? { ...item, isTranslating: true } : item
-    ));
-
-    try {
-      const [translatedTitle, translatedContent] = await Promise.all([
-        translateText(item.title),
-        translateText(item.content)
-      ]);
-
-      setNewsItems(prev => prev.map((item, i) => 
-        i === index ? {
-          ...item,
-          translatedTitle,
-          translatedContent,
-          isTranslating: false
-        } : item
-      ));
-    } catch (error) {
-      console.error('Translation error:', error);
-      setNewsItems(prev => prev.map((item, i) => 
-        i === index ? { ...item, isTranslating: false } : item
-      ));
-    }
-  };
+  useEffect(() => {
+    translateNewsItems();
+  }, [translateNewsItems]);
 
   if (isLoading) {
     return (
@@ -98,47 +91,32 @@ export default function NewsFeed() {
     <div className="bg-gray-800/50 rounded-xl p-6 backdrop-blur-sm border border-gray-700">
       <h2 className="text-xl font-semibold mb-4">Actualités Forex</h2>
       <div className="space-y-4">
-        {newsItems.map((item, index) => (
+        {translatedNews.map((item, index) => (
           <article key={index} className="p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition">
-            <div className="flex items-start justify-between gap-4">
-              <a href={item.link} target="_blank" rel="noopener noreferrer" className="flex-1">
-                <h3 className="font-medium mb-2 hover:text-emerald-400 transition">
-                  {item.translatedTitle || item.title}
-                </h3>
-                <p className="text-sm text-gray-400 mb-3">
-                  {item.translatedContent || item.content}
-                </p>
-                <div className="flex items-center justify-between text-sm text-gray-400">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{format(new Date(item.pubDate), 'HH:mm dd/MM')}</span>
-                    </div>
-                    {item.author && (
-                      <div className="flex items-center space-x-2">
-                        <User className="h-4 w-4" />
-                        <span>{item.author}</span>
-                      </div>
-                    )}
-                  </div>
+            <a href={item.link} target="_blank" rel="noopener noreferrer" className="block">
+              <h3 className="font-medium mb-2 hover:text-emerald-400 transition">
+                {item.translatedTitle}
+              </h3>
+              <p className="text-sm text-gray-400 mb-3">{item.translatedContent}</p>
+              <div className="flex items-center justify-between text-sm text-gray-400">
+                <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
-                    <Tag className="h-4 w-4" />
-                    <span>{item.category}</span>
+                    <Clock className="h-4 w-4" />
+                    <span>{format(new Date(item.pubDate), 'HH:mm dd/MM')}</span>
                   </div>
+                  {item.author && (
+                    <div className="flex items-center space-x-2">
+                      <User className="h-4 w-4" />
+                      <span>{item.author}</span>
+                    </div>
+                  )}
                 </div>
-              </a>
-              <button
-                onClick={() => handleTranslate(index)}
-                disabled={item.isTranslating || (!!item.translatedTitle && !!item.translatedContent)}
-                className={`p-2 rounded-lg transition-all flex-shrink-0
-                  ${item.translatedTitle && item.translatedContent
-                    ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
-                    : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                <Languages className={`h-5 w-5 ${item.isTranslating ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
+                <div className="flex items-center space-x-2">
+                  <Tag className="h-4 w-4" />
+                  <span>{item.category}</span>
+                </div>
+              </div>
+            </a>
           </article>
         ))}
       </div>
