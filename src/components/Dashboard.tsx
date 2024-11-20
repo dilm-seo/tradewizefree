@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, Settings as SettingsIcon, MessageSquare, Home, RefreshCw, Loader2 } from 'lucide-react';
+import { TrendingUp, Settings as SettingsIcon, MessageSquare, Home, RefreshCw, Loader2, FileText } from 'lucide-react';
 import NewsFeed from './NewsFeed';
 import MarketOverview from './MarketOverview';
 import TradingSignals from './TradingSignals';
@@ -13,18 +13,20 @@ import PromptManager from './PromptManager';
 import SentimentAnalysis from './SentimentAnalysis';
 import VolatilityAnalysis from './VolatilityAnalysis';
 import CentralBankMonitor from './CentralBankMonitor';
+import CommoditiesAnalysis from './CommoditiesAnalysis';
+import LogsViewer from './LogsViewer';
 import { useSettings } from '../context/SettingsContext';
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('markets');
+  const [activeTab, setActiveTab] = useState<'markets' | 'settings' | 'prompts' | 'logs'>('markets');
   const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
   const { settings } = useSettings();
 
   // Références aux composants pour déclencher leurs analyses
-  const fundamentalAnalysisRef = React.useRef<{ handleGenerateAnalysis: () => void }>(null);
-  const centralBankMonitorRef = React.useRef<{ handleAnalysis: () => void }>(null);
-  const sentimentAnalysisRef = React.useRef<{ handleAnalysis: () => void }>(null);
-  const volatilityAnalysisRef = React.useRef<{ handleAnalysis: () => void }>(null);
+  const fundamentalAnalysisRef = React.useRef<{ handleGenerateAnalysis: () => Promise<void> }>(null);
+  const centralBankMonitorRef = React.useRef<{ handleAnalysis: () => Promise<void> }>(null);
+  const sentimentAnalysisRef = React.useRef<{ handleAnalysis: () => Promise<void> }>(null);
+  const volatilityAnalysisRef = React.useRef<{ handleAnalysis: () => Promise<void> }>(null);
 
   const handleAnalyzeAll = async () => {
     if (isAnalyzingAll || !settings.apiKey) return;
@@ -56,6 +58,8 @@ export default function Dashboard() {
         );
       case 'prompts':
         return <PromptManager />;
+      case 'logs':
+        return <LogsViewer />;
       case 'markets':
       default:
         return (
@@ -89,6 +93,7 @@ export default function Dashboard() {
                 <TradingSignals />
                 <FundamentalAnalysis ref={fundamentalAnalysisRef} />
                 <CentralBankMonitor ref={centralBankMonitorRef} />
+                <CommoditiesAnalysis />
               </div>
               <div className="space-y-8">
                 <NewsFeed />
@@ -103,7 +108,7 @@ export default function Dashboard() {
     }
   };
 
-  const getTabClass = (tabName: string) => `
+  const getTabClass = (tabName: 'markets' | 'settings' | 'prompts' | 'logs') => `
     flex items-center space-x-2 px-4 py-2 rounded-lg transition
     ${activeTab === tabName 
       ? 'text-blue-400 bg-blue-400/10' 
@@ -129,7 +134,7 @@ export default function Dashboard() {
                 {activeTab !== 'markets' && (
                   <button
                     onClick={() => setActiveTab('markets')}
-                    className={getTabClass('home')}
+                    className={getTabClass('markets')}
                   >
                     <Home className="h-5 w-5" />
                     <span className="hidden md:inline">Accueil</span>
@@ -141,6 +146,13 @@ export default function Dashboard() {
                 >
                   <MessageSquare className="h-5 w-5" />
                   <span className="hidden md:inline">Prompts</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('logs')}
+                  className={getTabClass('logs')}
+                >
+                  <FileText className="h-5 w-5" />
+                  <span className="hidden md:inline">Logs</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('settings')}

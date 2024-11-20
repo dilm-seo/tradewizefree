@@ -13,38 +13,43 @@ interface VolatilityData {
   prediction: string;
 }
 
-const VOLATILITY_PROMPT = `En tant qu'analyste de volatilité forex, analysez les actualités récentes et les données de marché pour évaluer la volatilité attendue.
+const VOLATILITY_PROMPT = `Analysez la volatilité intraday des paires forex majeures.
 
-Données de marché actuelles :
+Marché actuel:
 {marketContext}
 
-Actualités récentes :
+Actualités:
 {newsContext}
 
-Instructions d'analyse :
-1. Pour chaque paire majeure, évaluez :
-   - Le niveau de volatilité actuel
-   - Les déclencheurs potentiels de volatilité
-   - La direction probable des mouvements
-   - L'amplitude attendue des variations
-
-2. Classez la volatilité :
-   - "high": Mouvements importants attendus (>0.5%)
-   - "medium": Mouvements modérés (0.2-0.5%)
-   - "low": Mouvements faibles (<0.2%)
-
-Format de réponse JSON :
+Répondez UNIQUEMENT avec un JSON valide de cette structure:
 {
-  "analysis": [{
-    "pair": string,
-    "volatility": "high" | "medium" | "low",
-    "score": number (0-100),
-    "triggers": string[],
-    "prediction": string
-  }]
-}`;
+  "analysis": [
+    {
+      "pair": "EUR/USD",
+      "volatility": "high" | "medium" | "low",
+      "score": number (0-100),
+      "triggers": [
+        "raison courte 1",
+        "raison courte 2"
+      ],
+      "prediction": "prédiction courte sur les prochaines heures"
+    }
+  ]
+}
 
-const VolatilityAnalysis = forwardRef((props, ref) => {
+Règles strictes:
+- Uniquement les paires EUR/USD, GBP/USD, USD/JPY
+- Analyse de la volatilité sur les prochaines 4-8 heures
+- volatility basée sur les mouvements attendus:
+  * high: >50 pips
+  * medium: 20-50 pips
+  * low: <20 pips
+- score: 0 (très calme) à 100 (très volatile)
+- triggers: 2-3 catalyseurs immédiats
+- prediction: max 100 caractères
+- Texte en français uniquement`;
+
+const VolatilityAnalysis = forwardRef<{ handleAnalysis: () => Promise<void> }, {}>((_props, ref) => {
   const [volatilityData, setVolatilityData] = useState<VolatilityData[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +57,25 @@ const VolatilityAnalysis = forwardRef((props, ref) => {
   const { settings } = useSettings();
   const { data: marketData } = useMarketData();
   const { data: news } = useNews();
+
+  const validateVolatilityData = (data: any): data is VolatilityData => {
+    const validPairs = ['EUR/USD', 'GBP/USD', 'USD/JPY'];
+    const validVolatility = ['high', 'medium', 'low'];
+    
+    return (
+      validPairs.includes(data.pair) &&
+      validVolatility.includes(data.volatility) &&
+      typeof data.score === 'number' &&
+      data.score >= 0 &&
+      data.score <= 100 &&
+      Array.isArray(data.triggers) &&
+      data.triggers.length >= 2 &&
+      data.triggers.length <= 3 &&
+      data.triggers.every((t: any) => typeof t === 'string' && t.length <= 50) &&
+      typeof data.prediction === 'string' &&
+      data.prediction.length <= 100
+    );
+  };
 
   const handleAnalysis = async () => {
     if (!settings.apiKey || isAnalyzing) return;
@@ -65,26 +89,58 @@ const VolatilityAnalysis = forwardRef((props, ref) => {
       }
 
       const marketContext = marketData
+        .filter(data => ['EUR/USD', 'GBP/USD', 'USD/JPY'].includes(data.symbol))
         .map(data => 
           `${data.symbol}: ${data.price} (${data.changePercent > 0 ? '+' : ''}${data.changePercent.toFixed(2)}%)`
         )
         .join('\n');
 
-      const newsContext = news
-        .slice(0, 10)
-        .map(item => `- ${item.translatedTitle || item.title}`)
-        .join('\n');
+      const relevantNews = news
+        .filter(item => {
+          const content = (item.title + item.content).toLowerCase();
+          return content.includes('eur') ||
+                 content.includes('usd') ||
+                 content.includes('gbp') ||
+                 content.includes('jpy') ||
+                 content.includes('volatility') ||
+                 content.includes('volatilité') ||
+                 content.includes('movement') ||
+                 content.includes('mouvement');
+        })
+        .slice(0, 3)
+        .map(item => item.translatedTitle || item.title);
 
-      const response = await analyzeMarket(VOLATILITY_PROMPT, {
+      if (relevantNews.length === 0) {
+        throw new Error("Aucune actualité pertinente disponible");
+      }
+
+      const result = await analyzeMarket(VOLATILITY_PROMPT, {
         marketContext,
-        newsContext
+        newsContext: relevantNews.join('\n')
       });
 
-      const parsed = JSON.parse(response);
-      setVolatilityData(parsed.analysis);
+      try {
+        const parsed = JSON.parse(result);
+        
+        if (!parsed || !Array.isArray(parsed.analysis)) {
+          throw new Error("Structure JSON invalide");
+        }
+
+        const validData = parsed.analysis.filter(validateVolatilityData);
+
+        if (validData.length === 0) {
+          throw new Error("Aucune analyse valide disponible");
+        }
+
+        setVolatilityData(validData);
+      } catch (parseError) {
+        console.error('Parse error:', parseError);
+        throw new Error("Format de réponse invalide");
+      }
     } catch (err) {
-      console.error('Erreur analyse volatilité:', err);
-      setError("Erreur lors de l'analyse de la volatilité");
+      const errorMessage = err instanceof Error ? err.message : "Une erreur s'est produite";
+      console.error('Erreur analyse volatilité:', errorMessage);
+      setError(errorMessage);
     } finally {
       setIsAnalyzing(false);
     }
@@ -116,7 +172,7 @@ const VolatilityAnalysis = forwardRef((props, ref) => {
         <div>
           <h2 className="text-xl font-semibold">Analyse de Volatilité</h2>
           <p className="text-sm text-gray-400 mt-1">
-            Évaluation de la volatilité attendue par paire
+            Évaluation de la volatilité sur 4-8 heures
           </p>
         </div>
         <div className="flex items-center space-x-4">
@@ -125,7 +181,7 @@ const VolatilityAnalysis = forwardRef((props, ref) => {
             onClick={handleAnalysis}
             disabled={isAnalyzing || !settings.apiKey}
             className="flex items-center space-x-2 px-4 py-2 bg-red-500 text-white rounded-lg 
-                     hover:bg-red-600 transition disabled:opacity-50 disabled:hover:bg-red-500"
+                     hover:bg-red-600 transition disabled:opacity-50"
           >
             {isAnalyzing ? (
               <>
@@ -155,7 +211,8 @@ const VolatilityAnalysis = forwardRef((props, ref) => {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-medium">{data.pair}</h3>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${getVolatilityBg(data.volatility)} ${getVolatilityColor(data.volatility)}`}>
-                {data.volatility.toUpperCase()}
+                {data.volatility === 'high' ? 'HAUTE' :
+                 data.volatility === 'medium' ? 'MOYENNE' : 'BASSE'}
               </span>
             </div>
 
@@ -167,15 +224,15 @@ const VolatilityAnalysis = forwardRef((props, ref) => {
                 />
               </div>
               <div className="flex justify-between mt-1 text-xs text-gray-400">
-                <span>Faible</span>
-                <span>Score: {data.score}%</span>
-                <span>Élevée</span>
+                <span>Calme</span>
+                <span>{data.score}%</span>
+                <span>Volatile</span>
               </div>
             </div>
 
             <div className="space-y-3">
               <div>
-                <h4 className="text-sm font-medium text-gray-300 mb-2">Déclencheurs potentiels:</h4>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Catalyseurs:</h4>
                 <ul className="list-disc list-inside text-sm text-gray-400 space-y-1">
                   {data.triggers.map((trigger, index) => (
                     <li key={index}>{trigger}</li>
@@ -183,14 +240,14 @@ const VolatilityAnalysis = forwardRef((props, ref) => {
                 </ul>
               </div>
               <div>
-                <h4 className="text-sm font-medium text-gray-300 mb-2">Prédiction:</h4>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Prévision:</h4>
                 <p className="text-sm text-gray-400">{data.prediction}</p>
               </div>
             </div>
           </div>
         ))}
 
-        {volatilityData.length === 0 && !isAnalyzing && (
+        {volatilityData.length === 0 && !isAnalyzing && !error && (
           <div className="col-span-2 text-center py-8 text-gray-400">
             Cliquez sur Analyser pour obtenir une analyse de la volatilité
           </div>
