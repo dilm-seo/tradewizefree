@@ -18,7 +18,7 @@ export default function EconomicCalendar() {
           width="100%"
           height="600"
           frameBorder="0"
-          allowTransparency={true}
+          allow="autoplay"
           className="transform scale-100 hover:scale-[1.02] transition-transform duration-300"
         />
       </div>

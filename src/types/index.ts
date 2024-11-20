@@ -1,30 +1,7 @@
-export interface NewsItem {
-  title: string;
-  link: string;
-  pubDate: string;
-  content: string;
-  category: string;
-  author?: string;
-}
+// Add GPTModel type
+export type GPTModel = 'gpt-3.5-turbo' | 'gpt-4' | 'gpt-4-turbo-preview';
 
-export interface MarketData {
-  symbol: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  timestamp?: number;
-}
-
-export interface TradingSignal {
-  symbol: string;
-  direction: 'buy' | 'sell';
-  entryPrice: number;
-  stopLoss: number;
-  takeProfit: number;
-  timeframe: string;
-  analysis: string;
-}
-
+// Update Settings interface
 export interface Settings {
   apiKey: string;
   refreshInterval: number;
@@ -33,28 +10,11 @@ export interface Settings {
   dailyLimit: number;
   lastResetDate?: string;
   theme: 'dark' | 'light';
+  gptModel: GPTModel;
   prompts: {
     fundamentalAnalysis: string;
     tradingSignals: string;
     aiInsights: string;
     mascot: string;
   };
-}
-
-export interface SettingsContextType {
-  settings: Settings;
-  updateSettings: (newSettings: Partial<Settings>) => void;
-}
-
-export type TranslationService = (text: string) => Promise<string>;
-
-export interface EconomicEvent {
-  date: string;
-  time: string;
-  currency: string;
-  impact: 'high' | 'medium' | 'low';
-  event: string;
-  actual?: string;
-  forecast?: string;
-  previous?: string;
 }

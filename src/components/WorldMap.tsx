@@ -14,6 +14,8 @@ interface TradingSession {
     y: number;
     radius: number;
   };
+  description: string;
+  volatility: 'high' | 'medium' | 'low';
 }
 
 const TRADING_SESSIONS: Record<string, {
@@ -21,58 +23,79 @@ const TRADING_SESSIONS: Record<string, {
   end: number;
   pairs: string[];
   coordinates: { x: number; y: number; radius: number };
+  description: string;
+  volatility: 'high' | 'medium' | 'low';
 }> = {
   'Sydney': {
     start: 22,
     end: 7,
-    pairs: ['AUD/USD', 'NZD/USD'],
-    coordinates: { x: 85, y: 80, radius: 20 }
+    pairs: ['AUD/USD', 'NZD/USD', 'AUD/JPY', 'EUR/AUD', 'GBP/AUD'],
+    coordinates: { x: 85, y: 80, radius: 20 },
+    description: "Session océanique avec focus sur l'AUD et le NZD",
+    volatility: 'low'
   },
   'Tokyo': {
     start: 0,
     end: 9,
-    pairs: ['USD/JPY', 'EUR/JPY', 'GBP/JPY'],
-    coordinates: { x: 82, y: 35, radius: 25 }
+    pairs: ['USD/JPY', 'EUR/JPY', 'GBP/JPY', 'AUD/JPY', 'CHF/JPY'],
+    coordinates: { x: 82, y: 35, radius: 25 },
+    description: "Session asiatique dominée par le Yen",
+    volatility: 'medium'
   },
   'Londres': {
     start: 8,
     end: 17,
-    pairs: ['GBP/USD', 'EUR/GBP', 'EUR/USD'],
-    coordinates: { x: 48, y: 25, radius: 25 }
+    pairs: ['GBP/USD', 'EUR/GBP', 'EUR/USD', 'GBP/JPY', 'EUR/CHF'],
+    coordinates: { x: 48, y: 25, radius: 25 },
+    description: "Session européenne la plus volatile",
+    volatility: 'high'
   },
   'New York': {
     start: 13,
     end: 22,
-    pairs: ['EUR/USD', 'USD/CAD', 'USD/CHF'],
-    coordinates: { x: 25, y: 35, radius: 25 }
+    pairs: ['EUR/USD', 'USD/CAD', 'USD/CHF', 'GBP/USD', 'USD/JPY'],
+    coordinates: { x: 25, y: 35, radius: 25 },
+    description: "Session américaine avec forte liquidité",
+    volatility: 'high'
   }
 };
 
-const SESSION_ANALYSIS_PROMPT = `En tant qu'analyste forex spécialisé dans la session de trading {session}, analysez les actualités suivantes pour identifier les opportunités spécifiques à cette période de marché.
+const SESSION_PROMPT = `Analysez la session de trading {session} en cours.
 
-Actualités de la session :
+Actualités récentes:
 {newsContext}
 
-Instructions d'analyse :
-1. Identifiez les actualités pertinentes pour la session {session}
-2. Évaluez l'impact sur les paires de devises typiques de cette session
-3. Déterminez les mouvements probables pendant les heures de trading
-4. Suggérez des points d'attention particuliers
+Répondez avec un JSON de cette structure:
+{
+  "analysis": {
+    "pairs": ["EUR/USD", "GBP/USD"],
+    "activity": "haute" | "moyenne" | "basse",
+    "volatility": "haute" | "moyenne" | "basse",
+    "opportunities": [
+      {
+        "pair": "EUR/USD",
+        "type": "breakout" | "range" | "trend",
+        "description": "description courte"
+      }
+    ]
+  }
+}`;
 
-Format : Réponse concise focalisée sur les opportunités immédiates.`;
+const PAIR_PROMPT = `Analysez la paire {pair} pendant la session actuelle.
 
-const PAIR_ANALYSIS_PROMPT = `En tant qu'analyste forex spécialisé sur {pair}, analysez le sentiment fondamental actuel basé sur les actualités récentes.
-
-Actualités récentes :
+Actualités récentes:
 {newsContext}
 
-Instructions d'analyse :
-1. Identifiez les facteurs fondamentaux impactant {pair}
-2. Évaluez le sentiment général (bullish/bearish/neutre)
-3. Déterminez les niveaux de volatilité attendus
-4. Suggérez des points d'attention particuliers
-
-Format : Réponse concise focalisée sur le sentiment actuel.`;
+Répondez avec un JSON de cette structure:
+{
+  "analysis": {
+    "sentiment": "bullish" | "bearish" | "neutral",
+    "volatility": "haute" | "moyenne" | "basse",
+    "activity": "haute" | "moyenne" | "basse",
+    "catalysts": ["raison 1", "raison 2"],
+    "risks": ["risque 1", "risque 2"]
+  }
+}`;
 
 export default function WorldMap() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -113,7 +136,9 @@ export default function WorldMap() {
         status: isActive ? 'active' : 'inactive',
         pairs: session.pairs,
         color: isActive ? 'bg-blue-500' : 'bg-gray-600',
-        coordinates: session.coordinates
+        coordinates: session.coordinates,
+        description: session.description,
+        volatility: session.volatility
       };
     });
 
@@ -136,6 +161,27 @@ export default function WorldMap() {
     return Array.from(pairs);
   };
 
+  const getActiveSessionsInfo = () => {
+    const active = activeSessions.filter(session => session.status === 'active');
+    if (active.length === 0) return null;
+
+    const descriptions = active.map(session => ({
+      name: session.name,
+      description: session.description,
+      volatility: session.volatility
+    }));
+
+    return descriptions;
+  };
+
+  const getVolatilityColor = (volatility: string) => {
+    switch (volatility) {
+      case 'high': return 'text-red-400';
+      case 'medium': return 'text-yellow-400';
+      default: return 'text-green-400';
+    }
+  };
+
   const analyzeSession = async (sessionName: string) => {
     if (!settings.apiKey || isAnalyzing) return;
     
@@ -145,31 +191,72 @@ export default function WorldMap() {
     setAnalysis(null);
 
     try {
-      const session = TRADING_SESSIONS[sessionName];
-      const sessionStart = session.start;
-      const sessionEnd = session.end;
-      
-      // Filtrer les news pertinentes pour la session
-      const sessionNews = news?.filter(item => {
-        const newsHour = new Date(item.pubDate).getHours();
-        if (sessionStart < sessionEnd) {
-          return newsHour >= sessionStart && newsHour < sessionEnd;
-        } else {
-          return newsHour >= sessionStart || newsHour < sessionEnd;
-        }
-      });
+      const sessionNews = news
+        ?.filter(item => {
+          const content = (item.title + item.content).toLowerCase();
+          const session = TRADING_SESSIONS[sessionName];
+          return session.pairs.some(pair => 
+            content.includes(pair.toLowerCase().replace('/', ''))
+          );
+        })
+        .slice(0, 3)
+        .map(item => item.translatedTitle || item.title);
 
-      const newsContext = sessionNews
-        ?.slice(0, 5)
-        .map(item => `- ${item.translatedTitle || item.title}`)
-        .join('\n') || 'Aucune actualité récente';
+      if (!sessionNews || sessionNews.length === 0) {
+        throw new Error("Aucune actualité pertinente pour cette session");
+      }
 
-      const result = await analyzeMarket(SESSION_ANALYSIS_PROMPT, {
+      const result = await analyzeMarket(SESSION_PROMPT, {
         session: sessionName,
-        newsContext
+        newsContext: sessionNews.join('\n')
       });
 
-      setAnalysis(result);
+      const parsed = JSON.parse(result);
+      const { analysis } = parsed;
+
+      setAnalysis(`
+        <div class="space-y-4">
+          <div class="grid grid-cols-3 gap-4">
+            <div class="p-3 bg-gray-800/50 rounded-lg">
+              <div class="text-sm text-gray-400 mb-1">Activité</div>
+              <div class="font-medium ${
+                analysis.activity === 'haute' ? 'text-red-400' :
+                analysis.activity === 'moyenne' ? 'text-yellow-400' :
+                'text-green-400'
+              }">${analysis.activity.toUpperCase()}</div>
+            </div>
+            <div class="p-3 bg-gray-800/50 rounded-lg">
+              <div class="text-sm text-gray-400 mb-1">Volatilité</div>
+              <div class="font-medium ${
+                analysis.volatility === 'haute' ? 'text-red-400' :
+                analysis.volatility === 'moyenne' ? 'text-yellow-400' :
+                'text-green-400'
+              }">${analysis.volatility.toUpperCase()}</div>
+            </div>
+            <div class="p-3 bg-gray-800/50 rounded-lg">
+              <div class="text-sm text-gray-400 mb-1">Paires actives</div>
+              <div class="font-medium text-blue-400">${analysis.pairs.length}</div>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <h4 class="text-sm font-medium text-gray-400">Opportunités</h4>
+            ${analysis.opportunities.map(opp => `
+              <div class="p-3 bg-gray-800/50 rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-medium text-blue-400">${opp.pair}</span>
+                  <span class="text-sm ${
+                    opp.type === 'breakout' ? 'text-purple-400' :
+                    opp.type === 'trend' ? 'text-emerald-400' :
+                    'text-yellow-400'
+                  }">${opp.type}</span>
+                </div>
+                <p class="text-sm text-gray-300">${opp.description}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `);
     } catch (error) {
       console.error('Error analyzing session:', error);
       setAnalysis('Erreur lors de l\'analyse de la session');
@@ -187,26 +274,79 @@ export default function WorldMap() {
     setAnalysis(null);
 
     try {
-      const relevantNews = news?.filter(item => 
-        item.title.includes(pair) || 
-        item.content.includes(pair) ||
-        pair.split('/').some(currency => 
-          item.title.includes(currency) || 
-          item.content.includes(currency)
-        )
-      );
+      const pairNews = news
+        ?.filter(item => {
+          const content = (item.title + item.content).toLowerCase();
+          return content.includes(pair.toLowerCase().replace('/', ''));
+        })
+        .slice(0, 3)
+        .map(item => item.translatedTitle || item.title);
 
-      const newsContext = relevantNews
-        ?.slice(0, 5)
-        .map(item => `- ${item.translatedTitle || item.title}`)
-        .join('\n') || 'Aucune actualité récente';
+      if (!pairNews || pairNews.length === 0) {
+        throw new Error("Aucune actualité pertinente pour cette paire");
+      }
 
-      const result = await analyzeMarket(PAIR_ANALYSIS_PROMPT, {
+      const result = await analyzeMarket(PAIR_PROMPT, {
         pair,
-        newsContext
+        newsContext: pairNews.join('\n')
       });
 
-      setAnalysis(result);
+      const parsed = JSON.parse(result);
+      const { analysis } = parsed;
+
+      setAnalysis(`
+        <div class="space-y-4">
+          <div class="grid grid-cols-3 gap-4">
+            <div class="p-3 bg-gray-800/50 rounded-lg">
+              <div class="text-sm text-gray-400 mb-1">Sentiment</div>
+              <div class="font-medium ${
+                analysis.sentiment === 'bullish' ? 'text-emerald-400' :
+                analysis.sentiment === 'bearish' ? 'text-red-400' :
+                'text-blue-400'
+              }">${
+                analysis.sentiment === 'bullish' ? 'HAUSSIER' :
+                analysis.sentiment === 'bearish' ? 'BAISSIER' :
+                'NEUTRE'
+              }</div>
+            </div>
+            <div class="p-3 bg-gray-800/50 rounded-lg">
+              <div class="text-sm text-gray-400 mb-1">Volatilité</div>
+              <div class="font-medium ${
+                analysis.volatility === 'haute' ? 'text-red-400' :
+                analysis.volatility === 'moyenne' ? 'text-yellow-400' :
+                'text-green-400'
+              }">${analysis.volatility.toUpperCase()}</div>
+            </div>
+            <div class="p-3 bg-gray-800/50 rounded-lg">
+              <div class="text-sm text-gray-400 mb-1">Activité</div>
+              <div class="font-medium ${
+                analysis.activity === 'haute' ? 'text-red-400' :
+                analysis.activity === 'moyenne' ? 'text-yellow-400' :
+                'text-green-400'
+              }">${analysis.activity.toUpperCase()}</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <h4 class="text-sm font-medium text-gray-400 mb-2">Catalyseurs</h4>
+              <ul class="space-y-1">
+                ${analysis.catalysts.map(catalyst => `
+                  <li class="text-sm text-emerald-400">• ${catalyst}</li>
+                `).join('')}
+              </ul>
+            </div>
+            <div>
+              <h4 class="text-sm font-medium text-gray-400 mb-2">Risques</h4>
+              <ul class="space-y-1">
+                ${analysis.risks.map(risk => `
+                  <li class="text-sm text-red-400">• ${risk}</li>
+                `).join('')}
+              </ul>
+            </div>
+          </div>
+        </div>
+      `);
     } catch (error) {
       console.error('Error analyzing pair:', error);
       setAnalysis('Erreur lors de l\'analyse de la paire');
@@ -216,7 +356,7 @@ export default function WorldMap() {
   };
 
   return (
-    <div className="bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 rounded-xl p-6 backdrop-blur-sm border border-blue-500/20 shadow-2xl transform transition-all duration-500 hover:scale-[1.02]">
+    <div className="bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 rounded-xl p-6 backdrop-blur-sm border border-blue-500/20 shadow-2xl">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
           Sessions de Trading
@@ -386,73 +526,68 @@ export default function WorldMap() {
         </div>
       </div>
 
-      {/* Active pairs display with enhanced styling */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-medium text-blue-400">
-          Paires actives :
-        </h3>
-        <div className="flex flex-wrap gap-2">
-          {getActivePairs().map(pair => (
-            <button
-              key={pair}
-              onClick={() => analyzePair(pair)}
-              className={`px-4 py-2 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-sm font-medium text-blue-400 mb-3">
+            Paires actives :
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {getActivePairs().map(pair => (
+              <button
+                key={pair}
+                onClick={() => analyzePair(pair)}
+                className={`px-4 py-2 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 
                          border border-blue-500/20 text-blue-400 rounded-full text-sm font-medium
-                         shadow-[0_0_15px_rgba(59,130,246,0.2)]
                          transform hover:scale-105 hover:-translate-y-1 transition-all duration-300
                          hover:shadow-[0_0_20px_rgba(59,130,246,0.3)]
                          ${selectedPair === pair ? 'ring-2 ring-blue-500' : ''}`}
-            >
-              {pair}
-            </button>
-          ))}
+              >
+                {pair}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Session status grid with enhanced styling */}
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {activeSessions.map(session => (
-          <button
-            key={session.name}
-            onClick={() => analyzeSession(session.name)}
-            className={`
-              p-4 rounded-lg border transition-all duration-500
-              ${session.status === 'active'
-                ? 'bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)]'
-                : 'bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-gray-700/30 hover:border-gray-600/50'}
-              transform hover:scale-[1.02] hover:-translate-y-0.5
-              ${selectedSession === session.name ? 'ring-2 ring-blue-500' : ''}
-            `}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-blue-400">{session.name}</span>
-              <div className={`w-2 h-2 rounded-full ${session.color} shadow-[0_0_10px_rgba(59,130,246,0.5)]`} />
-            </div>
-            <div className="text-xs text-cyan-400/80">
-              {TRADING_SESSIONS[session.name].start}:00 - {TRADING_SESSIONS[session.name].end}:00
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {/* Analysis Modal */}
-      {(selectedSession || selectedPair) && (
-        <div className="mt-6 p-4 bg-gray-800/50 rounded-lg border border-blue-500/20">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-blue-400">
-              {selectedSession ? `Analyse Session ${selectedSession}` : `Analyse ${selectedPair}`}
+        {getActiveSessionsInfo() && (
+          <div className="p-4 bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-lg border border-blue-500/20">
+            <h3 className="text-sm font-medium text-blue-400 mb-3">
+              Sessions actives :
             </h3>
-            {isAnalyzing && <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />}
+            <div className="space-y-3">
+              {getActiveSessionsInfo()?.map(session => (
+                <div key={session.name} className="flex items-center justify-between">
+                  <div>
+                    <span className="text-cyan-400 font-medium">{session.name}</span>
+                    <p className="text-sm text-gray-400">{session.description}</p>
+                  </div>
+                  <span className={`text-sm font-medium ${getVolatilityColor(session.volatility)}`}>
+                    Volatilité {session.volatility === 'high' ? 'élevée' : 
+                              session.volatility === 'medium' ? 'moyenne' : 'faible'}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="prose prose-invert max-w-none">
-            {analysis ? (
-              <div dangerouslySetInnerHTML={{ __html: analysis }} />
-            ) : (
-              <p className="text-gray-400">Analyse en cours...</p>
-            )}
+        )}
+
+        {(selectedSession || selectedPair) && (
+          <div className="p-4 bg-gray-800/50 rounded-lg border border-blue-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-blue-400">
+                {selectedSession ? `Analyse Session ${selectedSession}` : `Analyse ${selectedPair}`}
+              </h3>
+              {isAnalyzing && <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />}
+            </div>
+            <div className="prose prose-invert max-w-none">
+              {analysis ? (
+                <div dangerouslySetInnerHTML={{ __html: analysis }} />
+              ) : (
+                <p className="text-gray-400">Analyse en cours...</p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <style jsx>{`
         @keyframes float {

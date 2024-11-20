@@ -1,6 +1,28 @@
 import React from 'react';
-import { Settings as SettingsIcon, DollarSign, Clock, Database, Sun, Moon } from 'lucide-react';
+import { Settings as SettingsIcon, DollarSign, Clock, Database, Sun, Moon, Cpu } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
+import type { GPTModel } from '../types';
+
+const GPT_MODELS: { value: GPTModel; label: string; description: string; costInfo: string }[] = [
+  {
+    value: 'gpt-3.5-turbo',
+    label: 'GPT-3.5 Turbo',
+    description: 'Plus rapide et moins coûteux, idéal pour l\'analyse basique',
+    costInfo: '0.002€/1K tokens'
+  },
+  {
+    value: 'gpt-4',
+    label: 'GPT-4',
+    description: 'Plus précis mais plus coûteux, pour une analyse approfondie',
+    costInfo: '0.03€/1K tokens'
+  },
+  {
+    value: 'gpt-4-turbo-preview',
+    label: 'GPT-4 Turbo',
+    description: 'Version améliorée de GPT-4, plus rapide et moins coûteuse',
+    costInfo: '0.01€/1K tokens'
+  }
+];
 
 export default function Settings() {
   const { settings, updateSettings } = useSettings();
@@ -19,6 +41,10 @@ export default function Settings() {
 
   const handleDailyLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     updateSettings({ dailyLimit: parseFloat(e.target.value) });
+  };
+
+  const handleModelChange = (model: GPTModel) => {
+    updateSettings({ gptModel: model });
   };
 
   const toggleTheme = () => {
@@ -45,6 +71,32 @@ export default function Settings() {
               placeholder="sk-..."
               className="flex-1 bg-gray-900/50 dark:bg-gray-900/50 light:bg-gray-100 border border-gray-600 dark:border-gray-600 light:border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 transition dark:text-white light:text-gray-900"
             />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <label className="block text-sm font-medium dark:text-gray-300 light:text-gray-700">
+            Modèle GPT
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {GPT_MODELS.map((model) => (
+              <button
+                key={model.value}
+                onClick={() => handleModelChange(model.value)}
+                className={`p-4 rounded-lg border transition-all text-left
+                  ${settings.gptModel === model.value
+                    ? 'bg-blue-500/20 border-blue-500/40'
+                    : 'bg-gray-700/30 border-gray-600/30 hover:bg-gray-700/50'
+                  }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-blue-400">{model.label}</span>
+                  <Cpu className="h-5 w-5 text-blue-400" />
+                </div>
+                <p className="text-sm text-gray-400 mb-2">{model.description}</p>
+                <p className="text-xs text-blue-400/80">{model.costInfo}</p>
+              </button>
+            ))}
           </div>
         </div>
 
