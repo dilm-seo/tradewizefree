@@ -111,6 +111,7 @@ export default function Settings() {
               onChange={handleIntervalChange}
               className="flex-1 bg-gray-900/50 dark:bg-gray-900/50 light:bg-gray-100 border border-gray-600 dark:border-gray-600 light:border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 transition dark:text-white light:text-gray-900"
             >
+              <option value="10">10 secondes</option>
               <option value="30">30 secondes</option>
               <option value="60">1 minute</option>
               <option value="300">5 minutes</option>
