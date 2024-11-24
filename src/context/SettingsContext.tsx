@@ -3,64 +3,69 @@ import type { Settings, SettingsContextType } from '../types';
 import CostToast from '../components/CostToast';
 
 const defaultPrompts = {
-  fundamentalAnalysis: `Analysez ces actualités forex pour identifier les opportunités de trading immédiates:
+  fundamentalAnalysis: `Analyze the following forex news to identify immediate trading opportunities:
 
 {newsContext}
 
-Répondez avec un HTML bref et structuré contenant:
-1. Une liste de maximum 3 opportunités principales
-2. Pour chaque opportunité:
-   - La paire de devises concernée
-   - La direction probable (haussier/baissier)
-   - Le catalyseur principal
-   - Le risque majeur
+Respond with concise and structured HTML containing:
+1. A list of up to 3 key opportunities.
+2. For each opportunity:
+   - The relevant currency pair.
+   - The likely direction (bullish/bearish).
+   - The main catalyst.
+   - The primary risk.
 
-Utilisez ces classes Tailwind:
-- Titres: text-lg font-medium text-blue-400 mb-2
-- Sections: p-4 bg-gray-800/50 rounded-lg mb-4
-- Listes: space-y-2
-- Éléments: flex items-center justify-between
+Recommended Tailwind CSS classes:
+- Titles: `text-lg font-medium text-blue-400 mb-2`.
+- Sections: `p-4 bg-gray-800/50 rounded-lg mb-4`.
+- Lists: `space-y-2`.
+- Items: `flex items-center justify-between`.
 
-Soyez concis et direct.`,
+Be clear and direct in your response.
+Write in french`,
 
-  tradingSignals: `Analysez le marché forex actuel.
+  tradingSignals: `Analyze the current forex market and identify trading signals.
 
-Données de marché:
+Market data:
 {marketContext}
 
-Actualités:
+News:
 {newsContext}
 
-Répondez avec un JSON valide:
+Respond with a structured and valid JSON:
 {
   "signals": [
     {
-      "pair": string,
+      "pair": "string",
       "direction": "buy" | "sell",
-      "timing": string,
+      "timing": "string",
       "volatility": "high" | "medium" | "low",
-      "duration": string,
-      "analysis": string
+      "duration": "string",
+      "analysis": "string"
     }
   ]
-}`,
+}
+Write in french`,
 
-  aiInsights: `Analysez cette question sur le forex:
+  aiInsights: `Answer the following question about forex:
+
 {question}
 
-Contexte marché:
+Market context:
 {marketContext}
 
-Actualités:
+News:
 {newsContext}
 
-Répondez de manière concise et directe.`,
+Provide a concise and relevant response, focusing on key information.
+Write in french`,
 
-  mascot: `Analysez brièvement les actualités forex:
+  mascot: `Briefly analyze the following forex news:
+
 {newsContext}
 
-Répondez en 2-3 phrases maximum.
-Focalisez sur l'opportunité la plus importante.`
+Respond in 2–3 sentences, highlighting the most important opportunity identified.
+Write in french`
 };
 
 const defaultSettings: Settings = {
