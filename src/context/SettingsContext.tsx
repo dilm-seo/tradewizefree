@@ -16,10 +16,10 @@ Respond with concise and structured HTML containing:
    - The primary risk.
 
 Recommended Tailwind CSS classes:
-- Titles: `text-lg font-medium text-blue-400 mb-2`.
-- Sections: `p-4 bg-gray-800/50 rounded-lg mb-4`.
-- Lists: `space-y-2`.
-- Items: `flex items-center justify-between`.
+- Titles: text-lg font-medium text-blue-400 mb-2.
+- Sections: p-4 bg-gray-800/50 rounded-lg mb-4.
+- Lists: space-y-2.
+- Items: flex items-center justify-between.
 
 Be clear and direct in your response.
 Write in french`,
@@ -36,7 +36,7 @@ Respond with a structured and valid JSON:
 {
   "signals": [
     {
-      "pair": "string",
+      "pair": string,
       "direction": "buy" | "sell",
       "timing": "string",
       "volatility": "high" | "medium" | "low",
