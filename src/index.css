@@ -97,3 +97,26 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-500 dark:bg-gray-500;
 }
+
+@keyframes fadeColors {
+    0% {
+        background-color: #111827; /* Gris sombre initial */
+    }
+    25% {
+        background-color: #2563eb; /* Bleu */
+    }
+    50% {
+        background-color: #10b981; /* Vert émeraude */
+    }
+    75% {
+        background-color: #f59e0b; /* Jaune orangé */
+    }
+    100% {
+        background-color: #111827; /* Retour au gris sombre */
+    }
+}
+
+.to-gray-900 {
+    animation: fadeColors 4s infinite;
+    transition: background-color 1s ease-in-out;
+}
