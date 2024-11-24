@@ -56,11 +56,12 @@ News:
 
 Respond in French, concisely and directly.`,
 
-  mascot: `Briefly analyze the forex news:
-{newsContext}
+  mascot: `Briefly post telegram analyze the following forex news:
 
-Respond in French with 2-3 sentences maximum.
-Focus on the most important opportunity.`
+{newsContext} and {marketContext}
+
+Respond in 2–3 sentences with 2/3 emojy, intonation fun, highlighting the most important opportunity identified.
+Write in french.`
 };
 
 const defaultSettings: Settings = {
