@@ -1,74 +1,126 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Settings, SettingsContextType } from '../types';
-import CostToast from '../components/CostToast';
 
 const defaultPrompts = {
-  fundamentalAnalysis: `Analyze these forex news items to identify immediate trading opportunities:
+  fundamentalAnalysis: `En tant que day trader forex focalisé sur les news, analysez les actualités pour identifier les opportunités de trading immédiates.
 
+Contexte des actualités :
 {newsContext}
 
-Respond in French with brief, structured HTML containing:
-1. A list of up to 3 main opportunities
-2. For each opportunity:
-   - The relevant currency pair
-   - The probable direction (bullish/bearish)
-   - The main catalyst
-   - The major risk
+Instructions d'analyse :
+1. Identifiez les actualités à fort potentiel de volatilité :
+   - Breaking news
+   - Déclarations surprises
+   - Données économiques inattendues
+   - Changements politiques majeurs
 
-Use these Tailwind classes:
-- Titles: text-lg font-medium text-blue-400 mb-2
-- Sections: p-4 bg-gray-800/50 rounded-lg mb-4
-- Lists: space-y-2
-- Items: flex items-center justify-between
+2. Pour chaque actualité importante :
+   - Impact immédiat sur les devises (0-2h)
+   - Réaction probable du marché
+   - Paires de devises les plus sensibles
+   - Niveau de volatilité attendu
 
-Be concise and direct.`,
+3. Hiérarchisez les opportunités :
+   - Classement par potentiel de mouvement
+   - Timing optimal d'entrée
+   - Durée probable de l'impact
+   - Risques spécifiques à surveiller
 
-  tradingSignals: `Analyze the current forex market.
+Format : Réponse structurée en HTML avec classes Tailwind CSS, focalisée sur les opportunités de trading intraday.`,
 
-Market Data:
+  tradingSignals: `En tant que day trader news, générez des signaux de trading basés sur l'actualité immédiate.
+
+Données de marché actuelles :
 {marketContext}
 
-News:
+Actualités récentes :
 {newsContext}
 
-Respond in French with valid JSON:
-{
-  "signals": [
-    {
-      "pair": "string",
-      "direction": "buy" | "sell",
-      "timing": "string",
-      "volatility": "high" | "medium" | "low",
-      "duration": "string",
-      "analysis": "string"
-    }
-  ]
-}`,
+Instructions :
+1. Analysez uniquement les news avec impact immédiat :
+   - Breaking news
+   - Surprises de marché
+   - Réactions en cours
+   - Mouvements techniques significatifs
 
-  aiInsights: `Analyze this question about forex:
-{question}
+2. Pour chaque opportunité :
+   - Paire de devise concernée
+   - Direction probable
+   - Timing d'entrée optimal
+   - Durée estimée du mouvement
+   - Niveau de volatilité attendu
 
-Market Context:
-{marketContext}
+Format : JSON strict avec la structure :
+[{
+  symbol: string,
+  direction: "buy" | "sell",
+  timing: string,
+  volatility: "high" | "medium" | "low",
+  duration: string,
+  analysis: string (en français)
+}]`,
 
-News:
+  aiInsights: `En tant que day trader spécialisé dans le trading de news, analysez l'impact immédiat des actualités sur le marché forex.
+
+Données fondamentales :
+- Actualités récentes : {newsContext}
+- Données de marché : {marketContext}
+
+Instructions d'analyse :
+1. Évaluez les actualités par ordre d'importance :
+   - Breaking news et surprises majeures
+   - Actualités en développement
+   - Réactions de marché en cours
+   - Événements secondaires
+
+2. Pour chaque actualité significative :
+   - Impact immédiat sur les devises
+   - Durée probable de l'effet
+   - Volatilité attendue
+   - Risques spécifiques
+
+3. Identifiez les opportunités de trading :
+   - Timing optimal
+   - Paires les plus réactives
+   - Direction probable
+   - Durée estimée du mouvement
+
+4. Fournissez une conclusion actionnable :
+   - Meilleure opportunité immédiate
+   - Timing d'entrée suggéré
+   - Risques principaux
+   - Points de surveillance
+
+Format : Réponse structurée privilégiant les opportunités de trading immédiates basées sur les news.
+En l'absence de news significatives, indiquez clairement qu'il est préférable d'attendre de meilleures opportunités.`,
+
+  mascot: `En tant qu'assistant trading spécialisé dans l'analyse fondamentale, concentrez-vous uniquement sur les actualités à fort impact.
+
+Actualités récentes :
 {newsContext}
 
-Respond in French, concisely and directly.`,
+Événements économiques :
+{calendarContext}
 
-  mascot: `Briefly post telegram analyze the following forex news:
+Instructions :
+1. Analysez UNIQUEMENT :
+   - Les actualités à fort impact
+   - Les surprises économiques majeures
+   - Les déclarations importantes des banques centrales
+   - Les événements géopolitiques majeurs
 
-{newsContext} and {marketContext}
+2. Si une actualité à fort impact est détectée :
+   - Expliquez brièvement son importance
+   - Identifiez les devises les plus impactées
+   - Indiquez la direction probable du mouvement
+   - Estimez la durée potentielle de l'impact
 
-Respond in 2–3 sentences with 2/3 emojy, intonation fun, highlighting the most important opportunity identified immediately.
-Write in french.
+3. En l'absence d'actualités à fort impact :
+   - Vérifiez les actualités à impact moyen
+   - Si rien de significatif, recommandez d'attendre
 
-Exemple: 
-📊 Analyse du jour : {newsContext} impacte fortement le marché avec {marketContext} en toile de fond. 🔥
-
-La paire [nom de la paire] montre des signes clairs de mouvement [hausse/baisse], profitant d'une configuration fondamentale favorable. 🌍
-
-🎯 Signal immédiat : Acheter/Vendre [paire]. 🚀 Ou attendre...
+Format : Réponse très courte (2-3 phrases maximum) focalisée uniquement sur l'actualité la plus importante.
+Ne jamais fournir de niveaux de prix spécifiques.`
 };
 
 const defaultSettings: Settings = {
@@ -79,20 +131,10 @@ const defaultSettings: Settings = {
   dailyLimit: 5,
   lastResetDate: new Date().toISOString().split('T')[0],
   theme: 'dark',
-  gptModel: 'gpt-3.5-turbo',
   prompts: defaultPrompts
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
-
-// Export the hook
-export const useSettings = () => {
-  const context = useContext(SettingsContext);
-  if (context === undefined) {
-    throw new Error('useSettings must be used within a SettingsProvider');
-  }
-  return context;
-};
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<Settings>(() => {
@@ -109,9 +151,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
     return defaultSettings;
   });
-
-  const [showCostToast, setShowCostToast] = useState(false);
-  const [lastCost, setLastCost] = useState(0);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -146,16 +185,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           ...newSettings.prompts
         };
       }
-      
-      if (newSettings.apiCosts && newSettings.apiCosts !== prev.apiCosts) {
-        const costDiff = newSettings.apiCosts - prev.apiCosts;
-        if (costDiff > 0) {
-          setLastCost(costDiff);
-          setShowCostToast(true);
-          setTimeout(() => setShowCostToast(false), 3000);
-        }
-      }
-      
       return updated;
     });
   };
@@ -163,7 +192,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   return (
     <SettingsContext.Provider value={{ settings, updateSettings }}>
       {children}
-      <CostToast cost={lastCost} isVisible={showCostToast} />
     </SettingsContext.Provider>
   );
+}
+
+export function useSettings() {
+  const context = useContext(SettingsContext);
+  if (context === undefined) {
+    throw new Error('useSettings must be used within a SettingsProvider');
+  }
+  return context;
 }
