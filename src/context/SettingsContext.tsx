@@ -35,12 +35,12 @@ Respond in French with valid JSON:
 {
   "signals": [
     {
-      "pair": string,
+      "pair": "string",
       "direction": "buy" | "sell",
-      "timing": string,
+      "timing": "string",
       "volatility": "high" | "medium" | "low",
-      "duration": string,
-      "analysis": string
+      "duration": "string",
+      "analysis": "string"
     }
   ]
 }`,
