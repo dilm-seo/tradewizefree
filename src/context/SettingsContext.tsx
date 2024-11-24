@@ -64,9 +64,11 @@ Respond in 2–3 sentences with 2/3 emojy, intonation fun, highlighting the most
 Write in french.
 
 Exemple: 
-📊 Analyse du jour : {newsContext} impacte fortement le marché avec {marketContext} en toile de fond. 🔥 La paire [nom de la paire] montre des signes clairs de mouvement [hausse/baisse], profitant d'une configuration technique et fondamentale favorable. 🌍 Restez attentifs !
+📊 Analyse du jour : {newsContext} impacte fortement le marché avec {marketContext} en toile de fond. 🔥
 
-🎯 Opportunité : Acheter/Vendre [paire] avec [X]% de confiance [maintenant|après|avant]. 🚀
+La paire [nom de la paire] montre des signes clairs de mouvement [hausse/baisse], profitant d'une configuration fondamentale favorable. 🌍
+
+🎯 Signal immédiat : Acheter/Vendre [paire]. 🚀 Ou attendre...
 };
 
 const defaultSettings: Settings = {
