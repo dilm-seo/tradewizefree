@@ -14,18 +14,18 @@ interface NewsItemWithTranslation extends NewsItem {
 
 const mockNews: NewsItemWithTranslation[] = [
   {
-    title: "La BCE maintient ses taux directeurs",
+    title: "Patience, les infos se préparent une petite tasse de café avant d'arriver ! ☕",
     link: "#",
     pubDate: new Date().toISOString(),
-    content: "La Banque centrale européenne a décidé de maintenir ses taux...",
+    content: "Les marchés bougent vite, mais les infos prennent leur temps pour peaufiner leur stratégie ! 📈",
     category: "Central Bank",
     author: "Jean Dupont"
   },
   {
-    title: "L'inflation américaine plus élevée que prévu",
+    title: "Hé oui on patiente...",
     link: "#",
     pubDate: new Date().toISOString(),
-    content: "Les derniers chiffres de l'inflation aux États-Unis...",
+    content: "Si les actualités ne se mettent pas à jour après quelques secondes, n'hésitez pas à actualiser la page.",
     category: "News",
     author: "Marie Martin"
   }
