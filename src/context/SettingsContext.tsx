@@ -125,10 +125,10 @@ Ne jamais fournir de niveaux de prix spécifiques.`
 
 const defaultSettings: Settings = {
   apiKey: '',
-  refreshInterval: 60,
+  refreshInterval: 15,
   demoMode: true,
   apiCosts: 0,
-  dailyLimit: 5,
+  dailyLimit: 15,
   lastResetDate: new Date().toISOString().split('T')[0],
   theme: 'dark',
   prompts: defaultPrompts
