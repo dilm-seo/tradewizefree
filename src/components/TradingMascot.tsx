@@ -43,7 +43,7 @@ export default function TradingMascot() {
         .join('\n');
 
       const newsContext = news
-        .slice(0, 5) // Utiliser les 5 dernières news
+        .slice(0, 10) // Utiliser les 5 dernières news
         .map(item => 
           `- ${item.translatedTitle || item.title}\n  Impact: ${
             item.category.toLowerCase().includes('high') ? 'Élevé' :
